@@ -180,6 +180,12 @@ tuirec record --mouse-pointer all --binary ./myapp --keystrokes "..."
 
 ## For AI Agents
 
+If a GIF or PNG *looks* wrong but the live app looked fine, treat the **capture
+pipeline** as guilty first — keep the `.cast`, error-grep it, and only then
+change keystrokes or the app. Prefer **settled keyframes** for multi-step state
+demos and continuous `record` when motion itself is the story. Full agent
+semantics: `tuirec agent-guide` (and `agent/RECORDING-AGENT.md`).
+
 tuirec provides three layers of agent guidance — enabling agents to one-shot
 the creation of GIFs of TUI apps doing complicated stuff:
 

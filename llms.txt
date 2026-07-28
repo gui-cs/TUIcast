@@ -32,6 +32,8 @@ The guide covers:
 - Terminal.Gui app defaults (--kitty-keyboard, --startup-delay, etc.)
 - Known gotchas (cursor/page/arrow literal splitting, --agg-path requirement)
 - Composing demo recordings step by step
+- Capture integrity: pipeline-before-product, settle-then-snap, continuous vs keyframe
+- Sixel size/position: measure, don't eyeball
 
 ## Key flags
 

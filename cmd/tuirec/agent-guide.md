@@ -133,6 +133,11 @@ A keystroke script is a **comma-separated** string. Each token is one of:
   cast to see the final printed output). Post-exit terminal noise (stderr from
   ConfigurationManager, shell prompt redraws) is normal during `--drain` — filter
   accordingly when validating.
+- **Pipeline before product** — if the PNG/GIF shows wrong geometry, a false
+  solid color band, off-center chrome, or missing glyphs **but the live app
+  looked fine**, treat the capture pipeline as guilty first. Keep the `.cast`,
+  error-grep it, and only then change the keystroke script or the app. A green
+  tuirec exit code does not mean the image is faithful evidence.
 - **Verifying grid-anchored sixels — measure, don't eyeball** — confirming a
   sixel *appears* in the GIF, or that `agg` rendered it faithfully at the
   requested cursor cell, does **not** prove it is the right size or position: a
@@ -149,6 +154,8 @@ A keystroke script is a **comma-separated** string. Each token is one of:
   they agree and that the rendered bounding box spans the intended columns/rows.
   This is the cheap check that turns "looks right" into a number, which is the
   only thing that catches sub-cell and few-percent errors.
+  The same discipline applies beyond sixels: **measure or dual-check the cast**
+  whenever the picture surprises you.
 - **Key-name collisions with literal words** — bare tokens like `delete`, `home`,
   `end`, `space`, `tab` resolve as **key presses**, not literal text. If you mean
   to type those words as text, you must backtick-quote them: `` `delete` ``,
@@ -261,6 +268,19 @@ If running inside a restricted agent sandbox that blocks PTY-spawning commands:
 10. **Use `--drain 2000` for TUI apps** — after the last keystroke, keep
     recording for 2 seconds so the final UI state is visible in the GIF.
     Without drain, the recording may end before the last action renders.
+
+11. **Pick continuous vs keyframe on purpose** — one long `record` GIF is
+    perfect when *motion* is the story (typing cadence, scroll, animation).
+    For multi-step state demos (open dialog → change setting → save → quit),
+    a short sequence of **settled keyframes** is often clearer: after each
+    important action, wait for the UI to settle, capture a still (or keep a
+    cast frame), optionally caption the step, then assemble a short GIF.
+    Do not force product docs to spell out pixel-perfect chrome just so a
+    continuous recording looks tidy — fix waits and framing instead.
+
+12. **Settle before you snap** — the same rule as "wait after UI transitions,"
+    applied to stills: inject the key, wait until the view is stable, *then*
+    `snapshot` / assert. Snapping mid-repaint produces false "bugs."
 
 ---
 
@@ -564,6 +584,9 @@ When asked to "record <app> doing X", follow this process:
    can error in-frame and tuirec still finishes. For CLI apps, also grep for
    expected output (`grep "1966-09-10" demo.cast`). For TUI apps, the GIF is
    the positive verification — pair it with the error-grep as the negative check.
+   If the GIF looks *structurally* wrong (shifted layout, solid false color
+   bands, missing labels) while the live session looked fine, **debug the
+   pipeline and cast** before rewriting the app or the product spec.
 8. **If execution fails due to permissions**, output the full command for the user
    to run manually — do not loop retrying.
 9. **Report the output paths and the exact command used** back to the user so they

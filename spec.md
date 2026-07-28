@@ -81,6 +81,10 @@ Rewrite tuirec as a **cross-platform Go CLI** that records any terminal app and 
      GIF passes that). Decode the GIF and assert: ≥ 2 frames, non-zero
      dimensions, and non-trivial inter-frame pixel variance (the screen
      actually changed). For the test fixture, golden-frame compare.
+   - **Pipeline honesty:** a valid GIF that *looks wrong* is still a
+     pipeline problem until the cast proves the app painted that state.
+     Do not treat the rendered frame as ground truth for the product under
+     test without a cast-side check (see *Capture integrity* below).
 
 5. **FR-5: Max duration timeout**
    - Hard cap on recording duration (default 60s, configurable)
@@ -425,6 +429,91 @@ Encode these so they are **not** rediscovered:
   it has no `main` branch (use `v2_develop`), targets `net10.0`, and
   UICatalog lives at `Examples/UICatalog/UICatalog.csproj`. v1 should
   rely on `internal/testapp` and not take this dependency.
+
+## Capture integrity (field lessons)
+
+These lessons come from real host-side capture work (including non-PTY
+frame dumps used next to silico/product metal demos). They apply to
+**tuirec's** cast → PNG/GIF path and to agent workflows that treat those
+images as evidence.
+
+### Pipeline before product
+
+If a still or GIF disagrees with what a human saw on the live terminal
+(wrong geometry, false color bands, off-center chrome, missing glyphs):
+
+1. **Suspect the capture pipeline first** — not the product under test.
+2. Keep the `.cast` (or intermediate payload) and check it for expected
+   text / sequences before rewriting the app or the keystroke script.
+3. A green exit code and a file that "looks like an image" are not enough
+   (same spirit as FR-4: stronger than magic bytes).
+
+Sixel measurement already says "measure, don't eyeball" for size/position.
+The same honesty applies to **any** surprising visual: a few-percent size
+error and a transport-corrupted frame are both pipeline-class failures.
+
+### Transport and encoding invent bugs
+
+Any path that moves frame bytes through a **cooked text channel** (line
+ending conversion, log interleaving, partial reads) can invent solid color
+bands, horizontal shift, and "off-center" UIs that never appeared on the
+real screen. tuirec's cast format is JSON-lines of UTF-8 for a reason —
+it is not a raw framebuffer dump.
+
+When agents or tools add companion capture paths (serial snapshots, external
+frame sources, base64 payloads), they must:
+
+- Prefer text-safe encoding for binary rasters on serial/console links.
+- Silence concurrent log noise during payload emit, or delimit payloads so
+  interleaving is detectable.
+- Carry width/height/format (and ideally a checksum) in a clear header.
+- Decode with the **same** pixel packing the producer used; a wrong
+  RGB565 endian/swap looks like a product theme bug.
+
+### Scenario keyframes vs one long continuous GIF
+
+Continuous wall-clock recordings are excellent for "watch it happen."
+Multi-step demos (boot → theme → details → play → pause) are often clearer
+as a **short sequence of labeled keyframes**: inject input, **settle**,
+snapshot, annotate, then assemble a GIF.
+
+That pattern is compatible with today's CLI: `record` for motion, or
+repeated `snapshot` / retained cast frames for stills. Specs and agent
+guides should not force one style; they should say when each helps.
+
+- **Use continuous `record`** when motion itself is the story (scroll,
+  animation, typing cadence).
+- **Use keyframe scenarios** when the story is a sequence of states and
+  each state must be readable (and when full continuous capture is too
+  noisy or too expensive).
+- After every inject, wait for the UI to settle before the next snap —
+  the same reason `wait:` exists after dialogs.
+
+### Do not optimize product contracts for capture tools
+
+tuirec exists so demos of *real* apps are honest. Specs for those apps
+should stay human-readable. Capture tooling and agent guides absorb the
+pipeline discipline; product manuals should not grow "on-screen token
+tables" just so a recorder passes.
+
+## Companion capture (out of core v1, in-scope for honesty)
+
+tuirec v1 records **PTY output**, not device glass and not arbitrary
+host framebuffers (constitution: not a screen recorder of pixels). Host
+tooling next to silico-class metal products may still dump a product
+**shadow framebuffer** over serial for agent vision without a camera.
+
+That companion path is **not** a tuirec v1 feature requirement. It is
+listed here so maintainers do not:
+
+- Confuse metal frame dumps with `tuirec record` / `snapshot` semantics.
+- Silently expand v1 scope into a general device screen recorder.
+- Ignore the transport-integrity lessons above when those dumps exist
+  alongside tuirec artifacts in the same agent session.
+
+If a future milestone absorbs external frame sources, it starts as an
+explicit design (package boundary, encoding, validation) — not as a
+side effect of an agent guide tip.
 
 ## Key Risks
 
